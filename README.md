@@ -1,0 +1,3 @@
+This repo contains the code for a streamlit app used to visualize hail reports for 2000-2004 taken from NOAA Storm Prediction Center: https://www.spc.noaa.gov/wcm/
+
+Link to the app: https://hail-reports-app-for-context.streamlit.app/
