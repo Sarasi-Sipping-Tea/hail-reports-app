@@ -174,7 +174,7 @@ def main():
     default_lon = round(df['Longitude'].mean(), 2)
 
     with st.sidebar:
-        st.markdown(f"**Box Size:** ${BOX_SIZE_KM} \\text{km} \\times {BOX_SIZE_KM} \\text{km}$")
+        st.markdown(f"**Box Size:** {BOX_SIZE_KM} km x {BOX_SIZE_KM} km")
         selected_lat = st.number_input('Center Latitude ($^\circ$)', min_value=-90.0, max_value=90.0, value=default_lat, format="%.2f")
         selected_lon = st.number_input('Center Longitude ($^\circ$)', min_value=-180.0, max_value=180.0, value=default_lon, format="%.2f")
 
