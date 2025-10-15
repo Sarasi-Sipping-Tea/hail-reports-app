@@ -259,11 +259,7 @@ def main():
     data_load_state.text("Loading and preprocessing data...")
     # NOTE: Since the file is already uploaded, we use its accessible name
     try:
-        # Assuming the file is named '2000-2004_hail_utc.csv' based on the original snippet
-        # If the file name is 'hail_app (1).py', we cannot use this placeholder. 
-        # I'll use the placeholder name from the user's initial file upload and add a note.
-        # Original file seems to expect a different CSV name. I'll use the user's uploaded name as a placeholder for now.
-        df = load_and_preprocess_data("hail_app (1).py") # Placeholder: This needs to be the actual CSV file name
+        df = load_and_preprocess_data("2000-2004_hail_utc.csv") 
         # A more robust app would take the CSV as a file uploader input.
     except Exception as e:
         data_load_state.error(f"Error loading data: {e}. Please ensure the file is a valid CSV and is named correctly in the script.")
