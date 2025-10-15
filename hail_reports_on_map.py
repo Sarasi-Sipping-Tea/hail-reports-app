@@ -14,12 +14,13 @@ COLUMNS_FULL = [f'Col_{i}' for i in range(30)]
 COLUMNS_FULL[6] = 'Timezone' # For cleaning (Index 6)
 COLUMNS_FULL[10] = 'HailSize' # Hail Size (Index 10)
 COLUMNS_FULL[11] = 'Injuries' # Injuries (Index 11)
-COLUMNS_FULL[12] = 'Fatalities' # Fatalities (Index 12)
+COLUMNS_FULL[13] = 'PropertyLoss' # Estimated Property Loss (Index 13)
 COLUMNS_FULL[15] = 'Latitude' # Starting Latitude (Index 15)
 COLUMNS_FULL[16] = 'Longitude' # Starting Longitude (Index 16)
 COLUMNS_FULL[29] = 'Date' # UTC_time (Index 29, used for Time Series)
 
-TIME_SERIES_COLUMNS = ['HailSize', 'Injuries', 'Fatalities']
+# UPDATED: Replaced 'Fatalities' with 'PropertyLoss'
+TIME_SERIES_COLUMNS = ['HailSize', 'Injuries', 'PropertyLoss']
 # Geographic constants
 KM_PER_DEG_LAT = 110.574  # km per degree of latitude (approx)
 KM_PER_DEG_LON_EQUATOR = 111.320  # km per degree of longitude at the equator (approx)
@@ -38,22 +39,45 @@ def load_and_preprocess_data(uploaded_file):
     df = df.iloc[1:].copy()
 
     # Select only the columns needed for the app
-    columns_to_keep = [name for name in COLUMNS_FULL if name.startswith('Col_') is False]
-    df = df[columns_to_keep]
+    # Ensure all columns in TIME_SERIES_COLUMNS are available, plus Latitude, Longitude, Date, Timezone
+    required_cols = TIME_SERIES_COLUMNS + ['Latitude', 'Longitude', 'Date', 'Timezone']
+    columns_to_keep = [name for name in COLUMNS_FULL if name.startswith('Col_') is False and name not in ['Fatalities']]
+    
+    # We must explicitly define the columns to keep to ensure 'Fatalities' (Col_12) is dropped
+    # and 'PropertyLoss' (Col_13) is retained, along with the others.
+    # We rely on the COLUMNS_FULL assignments above to correctly pick the indices.
+    
+    # Check if the dataframe columns match the required names after indexing, otherwise Streamlit might crash.
+    # Re-select using the defined names to ensure consistency.
+    cols_to_use = [
+        'Timezone', 'HailSize', 'Injuries', 'PropertyLoss', 
+        'Latitude', 'Longitude', 'Date'
+    ]
+    
+    # Map from the old names (Col_X) to the new names
+    col_map = {idx: name for idx, name in enumerate(COLUMNS_FULL) if name in cols_to_use}
+    
+    # Since we loaded with COLUMNS_FULL, the current column names are correct, 
+    # but we must drop any we don't need, like the old 'Fatalities' name which maps to Col_12
+    
+    # Filter only the essential, renamed columns
+    df = df[cols_to_use + ['Col_12']]
+    df = df.drop(columns=['Col_12']) # Explicitly drop the old Fatalities column/index
 
     # --- Data Cleaning ---
 
     # 1. Handle Timezone exclusion: Filter out 'unknown' and '9=GMT' events
-    # Note: For this file, the 'Timezone' column (index 6) contains string representations
-    # of the Timezone code (e.g., '3'). We check for the specific exclusion strings.
+    # Note: We keep the cleaning logic as before
     df = df[~df['Timezone'].isin(['unknown', '9=GMT'])]
 
     # 2. Convert to numeric and date types
+    # UPDATED: Includes 'PropertyLoss'
     for col in TIME_SERIES_COLUMNS + ['Latitude', 'Longitude']:
         # Coerce to numeric, turning non-convertible values into NaN
         df[col] = pd.to_numeric(df[col], errors='coerce')
 
     # Drop any rows where key columns are NaN after conversion
+    # UPDATED: Includes 'PropertyLoss'
     df.dropna(subset=TIME_SERIES_COLUMNS + ['Latitude', 'Longitude'], inplace=True)
 
     # Convert Date column (UTC_time) to datetime objects
@@ -135,16 +159,18 @@ def create_timeseries_chart(df: pd.DataFrame, y_col: str, title: str) -> alt.Cha
     # Non-matching dates (where no event occurred) will have NaN for 'Value'.
     source = pd.merge(full_dates_df, daily_agg, on='Date', how='left')
 
-    # For 'Injuries' and 'Fatalities' (sum), fill missing values (no events) with 0.
+    # For 'Injuries' and 'PropertyLoss' (sum), fill missing values (no events) with 0.
     # For 'HailSize' (mean), we assume the user intends the average size of a day with no
     # reported events to be 0 for plotting purposes.
     source['Value'] = source['Value'].fillna(0)
-
+    
+    # Format for tooltip depending on the column
+    value_format = '.2f' if y_col == 'HailSize' else ',.0f' # Use comma separation for counts/loss
 
     chart = alt.Chart(source).mark_line(point=True).encode(
         x=alt.X('Date:T', title='UTC Date'),
         y=alt.Y('Value:Q', title=y_col, scale=alt.Scale(zero=True)), # Ensure scale starts at 0
-        tooltip=[alt.Tooltip('Date:T', title='Date (UTC)'), alt.Tooltip('Value:Q', title=y_col, format='.2f')]
+        tooltip=[alt.Tooltip('Date:T', title='Date (UTC)'), alt.Tooltip('Value:Q', title=y_col, format=value_format)]
     ).properties(
         title=title
     ).interactive()
@@ -402,7 +428,8 @@ def main():
 
     # --- Section 1: Overall Time Series Analysis ---
     st.header('1. Overall Time Series Analysis (All Data)')
-    st.markdown("**(Mean Hail Size, Total Injuries, and Total Fatalities per Day, using UTC Time). Dates with no reported events are shown as zero.**")
+    # UPDATED: Changed description to reflect Property Loss
+    st.markdown("**(Mean Hail Size, Total Injuries, and Total Property Loss per Day, using UTC Time). Dates with no reported events are shown as zero.**")
     
     cols = st.columns(len(TIME_SERIES_COLUMNS))
     for i, col in enumerate(TIME_SERIES_COLUMNS):
@@ -444,11 +471,20 @@ def main():
 
     st.info(f"Found **{len(cell_df):,}** events within the selected geographic cell.")
 
-    # 2.i. Time Series Analysis for Hail Size in Geographic Cell
-    st.subheader('i. Hail Size Time Series in Cell')
-    cell_ts_chart = create_timeseries_chart(cell_df, 'HailSize', 'Hail Size Time Series (Mean Daily in Cell)')
-    if cell_ts_chart:
-        st.altair_chart(cell_ts_chart, use_container_width=True)
+    # 2.i. Time Series Analysis for Key Metrics in Geographic Cell
+    # UPDATED: Display HailSize, Injuries, and PropertyLoss time series
+    st.subheader('i. Time Series of Hail Size, Injuries, and Property Loss in Cell')
+    cell_cols = st.columns(len(TIME_SERIES_COLUMNS))
+    for i, col in enumerate(TIME_SERIES_COLUMNS):
+        with cell_cols[i]:
+            chart = create_timeseries_chart(cell_df, col, f'{col} Time Series (Daily in Cell)')
+            if chart:
+                st.altair_chart(chart, use_container_width=True)
+            else:
+                st.info(f"No data available for {col} in cell.")
+                
+    st.markdown("---")
+
 
     # 2.ii. Histogram of ALL Hail Sizes in Geographic Cell (All Time)
     st.subheader('ii. Histogram of All Hail Sizes in Cell (All Time)')
