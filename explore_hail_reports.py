@@ -278,16 +278,17 @@ def main():
     # Set default lat/lon to a central point in the data's geographic range
     default_lat = round(df['Latitude'].mean(), 2)
     default_lon = round(df['Longitude'].mean(), 2)
+    
+    # --- Time Filter Initialization (Moved outside the sidebar to reuse variables later)
+    # Get unique years, year-months, and days for filtering
+    all_years = sorted(df['Year'].unique())
+    all_year_months = sorted(df['Year-Month'].unique())
+    all_year_month_days = sorted(df['Year-Month-Day'].unique()) # Full list of days
 
     with st.sidebar:
         st.markdown(f"**Box Size:** {BOX_SIZE_KM} km x {BOX_SIZE_KM} km")
         selected_lat = st.number_input('Center Latitude ($^\circ$)', min_value=-90.0, max_value=90.0, value=default_lat, format="%.2f")
         selected_lon = st.number_input('Center Longitude ($^\circ$)', min_value=-180.0, max_value=180.0, value=default_lon, format="%.2f")
-
-        # Get unique years, year-months, and days for filtering
-        all_years = sorted(df['Year'].unique())
-        all_year_months = sorted(df['Year-Month'].unique())
-        # The full list of days could be very long, so we will filter it dynamically based on the current selection.
 
         filter_options = ['All Time', 'Year', 'Year-Month', 'Day'] # Added 'Day' option
         selected_filter = st.radio("Time-Based Histogram Filter", options=filter_options, index=0)
@@ -303,11 +304,22 @@ def main():
             default_index = len(all_year_months) - 1 if all_year_months else 0
             year_month_filter = st.selectbox('Select Year-Month', options=all_year_months, index=default_index)
         elif selected_filter == 'Day':
-            # This is complex: need to filter the main DF first to get valid days
-            all_year_month_days = sorted(df['Year-Month-Day'].unique())
             default_index = len(all_year_month_days) - 1 if all_year_month_days else 0
             day_filter = st.selectbox('Select Day', options=all_year_month_days, index=default_index)
 
+    # --- Apply Time Filter to FULL dataset ---
+    full_restricted_df = df.copy()
+    filter_label = 'All Time'
+    
+    if selected_filter == 'Year' and year_filter is not None:
+        full_restricted_df = full_restricted_df[full_restricted_df['Year'] == year_filter]
+        filter_label = f'Year: {year_filter}'
+    elif selected_filter == 'Year-Month' and year_month_filter is not None:
+        full_restricted_df = full_restricted_df[full_restricted_df['Year-Month'] == year_month_filter]
+        filter_label = f'Month: {year_month_filter}'
+    elif selected_filter == 'Day' and day_filter is not None:
+        full_restricted_df = full_restricted_df[full_restricted_df['Year-Month-Day'] == day_filter]
+        filter_label = f'Day: {day_filter}'
 
     # --- Section 1: Overall Time Series Analysis ---
     st.header('1. Overall Time Series Analysis (All Data)')
@@ -324,6 +336,23 @@ def main():
 
     st.markdown("---")
 
+    # --- Section 3: Full Dataset Analysis (Time-Restricted) ---
+    st.header(f'3. Global Hail Size Distribution (Filtered by Time)')
+    
+    if full_restricted_df.empty:
+        st.warning(f"No hail events found globally for the selected period: **{filter_label}**.")
+    else:
+        st.info(f"Showing **{len(full_restricted_df):,}** total global events for the period: **{filter_label}**")
+        global_hist_chart, global_params = create_histogram(
+            full_restricted_df, 
+            f'Global Hail Size Distribution ({filter_label})'
+        )
+        if global_hist_chart:
+            st.altair_chart(global_hist_chart, use_container_width=True)
+            st.code(global_params)
+
+    st.markdown("---")
+    
     # --- Section 2: Geographic Cell Analysis ---
     st.header(f'2. Analysis for Geographic Cell Centered at ${selected_lat}^\circ, {selected_lon}^\circ$')
 
@@ -343,7 +372,7 @@ def main():
         st.altair_chart(cell_ts_chart, use_container_width=True)
 
     # 2.ii. Histogram of ALL Hail Sizes in Geographic Cell (Using the new function)
-    st.subheader('ii. Histogram of All Hail Sizes in Cell')
+    st.subheader('ii. Histogram of All Hail Sizes in Cell (All Time)')
     cell_hist_chart, cell_params = create_histogram(cell_df, 'Distribution of All Hail Sizes in Cell')
     if cell_hist_chart:
         st.altair_chart(cell_hist_chart, use_container_width=True)
@@ -351,20 +380,16 @@ def main():
 
     # 2.iii. Histogram of Hail Sizes in Geographic Cell Restricted by Time Filter
     st.subheader('iii. Time-Restricted Hail Size Histogram in Cell')
-
-    restricted_df = cell_df.copy()
-    filter_label = 'All Time'
     
-    # Apply Time Filter
+    # Filter the cell data using the already determined time filter variables
+    restricted_df = cell_df.copy()
+    
     if selected_filter == 'Year' and year_filter is not None:
         restricted_df = restricted_df[restricted_df['Year'] == year_filter]
-        filter_label = f'Year: {year_filter}'
     elif selected_filter == 'Year-Month' and year_month_filter is not None:
         restricted_df = restricted_df[restricted_df['Year-Month'] == year_month_filter]
-        filter_label = f'Month: {year_month_filter}'
     elif selected_filter == 'Day' and day_filter is not None:
         restricted_df = restricted_df[restricted_df['Year-Month-Day'] == day_filter]
-        filter_label = f'Day: {day_filter}'
 
     # Output Results
     if restricted_df.empty:
