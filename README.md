@@ -2,4 +2,4 @@ This repo contains the code for a streamlit app used to visualize hail reports f
 
 Link to the app: https://hail-reports-histograms.streamlit.app/
 
-Updated app with the map present for reference: https://hail-reports-on-map.streamlit.app/
+Updated app with the map, and distribution fits present for reference: https://hail-reports-analysis.streamlit.app/
