@@ -427,10 +427,12 @@ def main():
         filter_label = f'Day: {day_filter}'
 
     # --- Section 1: Overall Time Series Analysis ---
-    st.header('1. Overall Time Series Analysis (All Data)')
+    st.header('1. Overall Hail Event Analysis (All Data)')
     # UPDATED: Changed description to reflect Property Loss
     st.markdown("**(Mean Hail Size, Total Injuries, and Total Property Loss per Day, using UTC Time). Dates with no reported events are shown as zero.**")
     
+    # 1.i. Time Series Charts
+    st.subheader('i. Time Series of Key Metrics (All Time)')
     cols = st.columns(len(TIME_SERIES_COLUMNS))
     for i, col in enumerate(TIME_SERIES_COLUMNS):
         with cols[i]:
@@ -439,6 +441,17 @@ def main():
                 st.altair_chart(chart, use_container_width=True)
             else:
                 st.info(f"No data available for {col}.")
+    
+    # NEW: 1.ii. Global Hail Size Histogram (All Time)
+    st.subheader('ii. Global Hail Size Distribution (All Time)')
+    global_all_time_hist_chart, global_all_time_params = create_histogram(
+        df, 
+        'Global Hail Size Distribution (All Time)'
+    )
+    if global_all_time_hist_chart:
+        st.altair_chart(global_all_time_hist_chart, use_container_width=True)
+        st.code(global_all_time_params)
+
 
     st.markdown("---")
 
