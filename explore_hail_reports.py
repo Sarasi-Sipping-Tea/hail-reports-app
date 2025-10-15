@@ -136,17 +136,9 @@ def create_timeseries_chart(df: pd.DataFrame, y_col: str, title: str) -> alt.Cha
     source = pd.merge(full_dates_df, daily_agg, on='Date', how='left')
 
     # For 'Injuries' and 'Fatalities' (sum), fill missing values (no events) with 0.
-    # For 'HailSize' (mean), we should only fill with 0 if we assume the average hail size 
-    # of a non-existent event is 0. A safer approach for HailSize (mean) is to only plot 
-    # actual means, but the requirement is "add a single event with 0 entry for each day where 
-    # there isn't a hail event."
-
-    if y_col == 'HailSize':
-        # If mean is 0, it means no hail event occurred, so fill NaN with 0
-        source['Value'] = source['Value'].fillna(0)
-    else:
-        # If sum is 0, it means no injuries/fatalities occurred, so fill NaN with 0
-        source['Value'] = source['Value'].fillna(0)
+    # For 'HailSize' (mean), we assume the user intends the average size of a day with no
+    # reported events to be 0 for plotting purposes.
+    source['Value'] = source['Value'].fillna(0)
 
 
     chart = alt.Chart(source).mark_line(point=True).encode(
@@ -185,7 +177,6 @@ def create_histogram(df: pd.DataFrame, title: str) -> Tuple[alt.Chart, str]:
         
         # Determine the maximum height of the histogram bins for scaling the fitted curve
         hist, bins = np.histogram(hail_sizes, bins=50)
-        max_hist_count = hist.max()
         
         # Calculate the bin width for normalization
         bin_width = bins[1] - bins[0]
@@ -220,7 +211,8 @@ def create_histogram(df: pd.DataFrame, title: str) -> Tuple[alt.Chart, str]:
     # 4. Create the Altair Histogram (Bar Chart)
     hist_chart = alt.Chart(df).mark_bar().encode(
         x=alt.X('HailSize:Q', bin=alt.Bin(maxbins=50), title='Hail Size (Inches)'),
-        y=alt.Y('count()', title='Number of Events', axis=alt.Axis(min=0)),
+        # CORRECTED: Replaced axis=alt.Axis(min=0) with scale=alt.Scale(zero=True)
+        y=alt.Y('count()', title='Number of Events', scale=alt.Scale(zero=True)),
         tooltip=[alt.Tooltip('HailSize:Q', bin=True, title='Hail Size Bin'), 'count()']
     ).properties(
         title=title
@@ -230,7 +222,8 @@ def create_histogram(df: pd.DataFrame, title: str) -> Tuple[alt.Chart, str]:
     if 'curve_df' in locals():
         curve_chart = alt.Chart(curve_df).mark_line(color='red', strokeDash=[5, 5]).encode(
             x=alt.X('HailSize:Q'),
-            y=alt.Y('Density:Q', title='Number of Events'),
+            # Use the same scale for the overlaid curve for consistency
+            y=alt.Y('Density:Q', title='Number of Events', scale=alt.Scale(zero=True)),
             tooltip=[alt.Tooltip('HailSize:Q'), alt.Tooltip('Density:Q', title='Lognorm Count', format='.1f')]
         )
         
@@ -256,23 +249,26 @@ def main():
 
     # --- Data Loading ---
     data_load_state = st.empty()
-    data_load_state.text("Loading and preprocessing data...")
-    # NOTE: Since the file is already uploaded, we use its accessible name
+    data_load_state.text("Attempting to load and preprocess data...")
+    
+    # The name of the data file is usually '2000-2004_hail_utc.csv'
+    DATA_FILE_NAME = "2000-2004_hail_utc.csv"
+    
     try:
-        df = load_and_preprocess_data("2000-2004_hail_utc.csv") 
-        # A more robust app would take the CSV as a file uploader input.
+        df = load_and_preprocess_data(DATA_FILE_NAME)
     except Exception as e:
-        data_load_state.error(f"Error loading data: {e}. Please ensure the file is a valid CSV and is named correctly in the script.")
+        # If loading the expected file fails, check if the error is due to file not found
+        if "No such file or directory" in str(e):
+             data_load_state.error(f"Error: Data file '{DATA_FILE_NAME}' not found. Please ensure the required CSV data file is uploaded with the correct name.")
+        else:
+            # Handle other loading/parsing errors
+            data_load_state.error(f"Error loading data from '{DATA_FILE_NAME}': {e}. Check the file format.")
         st.stop()
 
-    if df.empty:
-        # Try a common default name if the placeholder failed
-        try:
-             df = load_and_preprocess_data("2000-2004_hail_utc.csv")
-        except Exception:
-             data_load_state.error("Data is empty or could not be loaded/cleaned. Check your file format and ensure the CSV data file is available.")
-             st.stop()
 
+    if df.empty:
+        data_load_state.error("Data is empty or could not be loaded/cleaned. Check your file format.")
+        st.stop()
 
     data_load_state.success(f"Data loaded successfully! Total events: {len(df):,}")
 
@@ -382,8 +378,4 @@ def main():
 
 
 if __name__ == '__main__':
-    # Add a check here for the file name. The original script used '2000-2004_hail_utc.csv'
-    # but the user uploaded 'hail_app (1).py'. We must assume the user provides the correct data file 
-    # to the environment, or the script will fail at load. The `main` function has been updated 
-    # to attempt to load a hardcoded name as a fallback.
     main()
