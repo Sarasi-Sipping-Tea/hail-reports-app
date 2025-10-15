@@ -260,10 +260,12 @@ def create_frequency_histogram(df: pd.DataFrame, time_interval: str, title: str)
     if len(event_counts_data) < 2:
         return None, "Not enough periods to fit a distribution (check date range/interval)."
     
-    # 2. Fit the Poisson Distribution
+    # 2. Fit the Poisson Distribution using the Maximum Likelihood Estimate (MLE)
+    # The MLE for the Poisson rate (lambda) is simply the mean of the observed counts.
     try:
-        # Fit lambda (mu) to the observed event counts per period. floc=0 is standard.
-        lambda_param, loc_poisson = poisson.fit(event_counts_data, floc=0)
+        # UPDATED: Use the mean as the MLE for the Poisson rate (lambda). Fix loc at 0.
+        lambda_param = event_counts_data.mean()
+        loc_poisson = 0 # Fixed location parameter for Poisson
         
         # 3. Create data for the fitted PMF (Probability Mass Function)
         # Max observed event count per period
@@ -283,12 +285,13 @@ def create_frequency_histogram(df: pd.DataFrame, time_interval: str, title: str)
         })
         
         param_str = (
-            f"Fitted Poisson Parameters (poisson.fit):\n"
-            f"Rate (λ): {lambda_param:.4f}\n"
+            f"Fitted Poisson Parameters (MLE):\n"
+            f"Rate (λ): {lambda_param:.4f} (Mean Events per Period)\n"
             f"Location (loc): {loc_poisson:.4f} (Fixed at 0)"
         )
         
     except Exception as e:
+        # Fallback error message if the mean calculation or PMF creation fails unexpectedly
         st.warning(f"Could not fit Poisson distribution: {e}")
         param_str = "Poisson Fitting failed."
         curve_chart = None
