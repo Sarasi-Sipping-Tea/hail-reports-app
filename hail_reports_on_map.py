@@ -284,19 +284,6 @@ def main():
         st.subheader("Map Selection (Default: Center of US Data)")
         st.markdown(f"**Box Size:** {BOX_SIZE_KM} km x {BOX_SIZE_KM} km")
         
-        # Prepare data for map (limit points for performance)
-        map_df = df[['Latitude', 'Longitude']].rename(columns={'Latitude': 'lat', 'Longitude': 'lon'})
-        
-        # Use st.map to display hail events.
-        # Note: st.map does not provide click events, but it offers a visual way to choose coordinates.
-        st.map(
-            map_df,
-            latitude='lat',
-            longitude='lon',
-            zoom=3,
-            size=1, # Use a small size for points
-            use_container_width=True
-        )
         
         # Provide user with an option to manually enter or revert to default coordinates
         coord_choice = st.radio(
@@ -327,6 +314,50 @@ def main():
         # Update session state with manual inputs
         st.session_state['selected_lat'] = selected_lat
         st.session_state['selected_lon'] = selected_lon
+
+        # --- Create Map with Selected Point Highlighted ---
+        
+        # 1. Prepare data for map (limit points for performance)
+        map_df = df[['Latitude', 'Longitude']].rename(columns={'Latitude': 'lat', 'Longitude': 'lon'})
+        
+        # 2. Create the center point DataFrame
+        center_point_df = pd.DataFrame({
+            'lat': [selected_lat],
+            'lon': [selected_lon],
+            'color': ['#FF0000']
+        })
+
+        # 3. Altair Chart for all hail events (faint points)
+        base = alt.Chart(map_df).encode(
+            latitude='lat:Q',
+            longitude='lon:Q',
+            tooltip=['lat', 'lon']
+        ).properties(
+            title='Hail Events and Selected Center'
+        )
+
+        # Layer 1: All hail events (small, light markers)
+        hail_events = base.mark_circle(size=10, opacity=0.3, color='#006400').encode(
+            tooltip=['lat', 'lon']
+        )
+
+        # Layer 2: The selected center point (large, red marker)
+        center_marker = alt.Chart(center_point_df).mark_circle(size=200, color='red', opacity=0.8, stroke='black', strokeWidth=1).encode(
+            latitude='lat:Q',
+            longitude='lon:Q',
+            tooltip=[
+                alt.Tooltip('lat', title='Center Lat', format='.2f'), 
+                alt.Tooltip('lon', title='Center Lon', format='.2f')
+            ]
+        )
+        
+        # Combine layers
+        map_chart = (hail_events + center_marker).interactive().properties(
+            height=300
+        )
+        
+        st.altair_chart(map_chart, use_container_width=True)
+        st.markdown(f"**Selected Center:** ${selected_lat}^\circ, {selected_lon}^\circ$")
 
         st.markdown("---") # Separator for Time Filter
 
@@ -419,7 +450,7 @@ def main():
     if cell_ts_chart:
         st.altair_chart(cell_ts_chart, use_container_width=True)
 
-    # 2.ii. Histogram of ALL Hail Sizes in Geographic Cell (Using the new function)
+    # 2.ii. Histogram of ALL Hail Sizes in Geographic Cell (All Time)
     st.subheader('ii. Histogram of All Hail Sizes in Cell (All Time)')
     cell_hist_chart, cell_params = create_histogram(cell_df, 'Distribution of All Hail Sizes in Cell')
     if cell_hist_chart:
