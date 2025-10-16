@@ -10,9 +10,37 @@ import re
 
 # --- Configuration Constants ---
 
+import streamlit as st
+import pandas as pd
+import numpy as np
+import altair as alt
+from typing import Tuple, List, Dict
+from scipy.stats import lognorm
+from glob import glob
+import os
+import re
+
+# --- Configuration Constants (FIXED) ---
+
+# Get the directory of the currently executing script (streamlit_app.py)
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# the structure is:
+# /some/path/
+# ├── streamlit_app.py
+# └── hail-reports-app/
+#     └── comparison_data/
+#         └── daily_combined_data_200305xx.csv
+
+DATA_DIR = os.path.join(BASE_DIR, "hail-reports-app", "comparison_data")
+
+SAMPLE_FILE = "daily_combined_data_20030501.csv" # used as a local fallback check
+
+# ... rest of the constants
+
 # Define the directory where the daily CSV files are stored
-DATA_DIR = "hail-reports-app/comparison_data"
-SAMPLE_FILE = "daily_combined_data_20030501.csv" # Provided sample file name
+#DATA_DIR = "hail-reports-app/comparison_data"
+#SAMPLE_FILE = "daily_combined_data_20030501.csv" # Provided sample file name
 
 # Columns for Hail Size Selection (For Log-Normal Fit)
 MESH_SIZE_COLS = {
