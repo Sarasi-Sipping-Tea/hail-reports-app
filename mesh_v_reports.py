@@ -11,7 +11,7 @@ import re
 # --- Configuration Constants ---
 
 # Define the directory where the daily CSV files are stored
-data_dir = "hail-reports-app/comparison_data"
+DATA_DIR = "hail-reports-app/comparison_data"
 SAMPLE_FILE = "daily_combined_data_20030501.csv" # Provided sample file name
 
 # Columns for Hail Size Selection (For Log-Normal Fit)
