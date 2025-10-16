@@ -49,50 +49,23 @@ ENVIRONMENTAL_COLS = ['SHI_max', 'z0C', 'z20C', 'llrh', 'laps', 'pwat', 'lap24',
 def load_and_preprocess_data_combined(data_dir: str, sample_file: str) -> pd.DataFrame:
     """
     Loads, combines, and preprocesses all daily data files.
-    NOTE: For the user's final application, all 'daily_combined_data_YYYYMMDD.csv'
-    files for 2003-05 must be placed in the 'hail/comparison_data' directory.
     """
     all_data = []
-    
-    # 1. Simulate finding files. In a real app, use glob.
-    # We will check for the sample file first.
     file_list = []
+    
+    # 1. Search for files in the specified data directory
     if os.path.isdir(data_dir):
         # Look for all files matching the pattern
+        # The os.path.join correctly handles slashes for different operating systems
         file_list = glob(os.path.join(data_dir, "daily_combined_data_*.csv"))
     
-    # If the file list is empty, assume the user only provided the sample file in the root.
+    # 2. Fallback: If no files were found in the full directory, check the root 
+    # for the sample file (in case the user only uploaded the sample).
     if not file_list and os.path.exists(sample_file):
-        file_list.append(sample_file)
+        file_list.append(sample_file) # Use the single file as the dataset
 
     if not file_list:
         st.error(f"Error: No data files found in '{data_dir}' or the root directory. Please check your data path.")
-        return pd.DataFrame()
-
-    # Regex to extract the date from the filename: YYYYMMDD
-    date_regex = re.compile(r"(\d{8})")
-
-    # 2. Loop through all found files
-    for f in file_list:
-        try:
-            df = pd.read_csv(f)
-            
-            # Extract date from filename (e.g., 20030501 from ...20030501.csv)
-            match = date_regex.search(f)
-            if match:
-                date_str = match.group(1)
-                # Convert YYYYMMDD to a proper date
-                df['Date'] = pd.to_datetime(date_str, format='%Y%m%d')
-            else:
-                # Fallback if date is not in the filename for some reason
-                df['Date'] = pd.NaT 
-
-            all_data.append(df)
-        except Exception as e:
-            st.warning(f"Could not load or process file {f}: {e}")
-            continue
-
-    if not all_data:
         return pd.DataFrame()
 
     # 3. Concatenate all dataframes
